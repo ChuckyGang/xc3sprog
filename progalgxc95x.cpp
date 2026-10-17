@@ -100,15 +100,30 @@ int ProgAlgXC95X::flow_blank_check()
   
 }
 
-void ProgAlgXC95X::flow_erase()
+int ProgAlgXC95X::flow_erase()
 {
   byte data[3] = {0x03, 0, 0};
+  int i;
   jtag->shiftIR(&ISC_ERASE);
   jtag->shiftDR(data,0,18);
+  /* Full-chip erase can take well over 500 ms on the larger XC9500XL
+     parts. Poll the erase status instead of using one fixed wait, and
+     report failure if it never completes (max ~5 s). */
   jtag->Usleep(500000);
-  jtag->shiftDR(0,data,18);
-  if((data[0]& 0x03) != 0x01)
-    fprintf(stderr, "Erase still running %02x\n", data[0]);
+  for (i = 0; i < 45; i++)
+    {
+      jtag->shiftDR(0,data,18);
+      if((data[0]& 0x03) == 0x01)
+        {
+          if(jtag->getVerbose())
+            fprintf(stderr, "Erase done after %d ms\n", 500 + i*100);
+          return 0;
+        }
+      jtag->Usleep(100000);
+    }
+  fprintf(stderr, "Erase still running after %d ms (status %02x)\n",
+          500 + i*100, data[0]);
+  return 1;
 }
   
 #define MaxSector 108
@@ -360,9 +375,9 @@ void ProgAlgXC95X::array_read(JedecFile &file)
   flow_disable();
 }
 
-void ProgAlgXC95X::array_program(JedecFile &file)
+int ProgAlgXC95X::array_program(JedecFile &file)
 {
-  flow_array_program(file);
+  return flow_array_program(file);
 }
 
 int ProgAlgXC95X::array_verify(JedecFile &file)

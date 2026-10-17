@@ -1347,7 +1347,11 @@ int programXC95X(Jtag &jtag, unsigned long id, int argc, char **args,
     
     if (erase)
     {
-        alg.erase();
+        if (alg.erase())
+        {
+            fprintf(stderr, "Erase failed, device not blank\n");
+            return 1;
+        }
     }
     
     for (i = 0; i< argc; i++)
@@ -1400,10 +1404,22 @@ int programXC95X(Jtag &jtag, unsigned long id, int argc, char **args,
                 if (!erase)
                 {
                     ret = alg.erase();
+                    if (ret)
+                    {
+                        fprintf(stderr, "Erase failed, device not blank -- not programming\n");
+                        return ret;
+                    }
                 }
 	    }
 	    if(tolower(action) == 'w')
-                alg.array_program(jedecfile);
+            {
+                ret = alg.array_program(jedecfile);
+                if (ret)
+                {
+                    fprintf(stderr, "Programming failed\n");
+                    return ret;
+                }
+            }
             ret = alg.array_verify(jedecfile);
         }
         if(ret)
